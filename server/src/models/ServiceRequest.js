@@ -1,0 +1,3 @@
+import mongoose from 'mongoose';
+const serviceRequestSchema = new mongoose.Schema({ customer: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, entrepreneur: { type: mongoose.Schema.Types.ObjectId, ref: 'Entrepreneur', required: true }, serviceName: { type: String, required: true, trim: true }, details: { type: String, trim: true, maxlength: 1000 }, requestedDate: Date, status: { type: String, enum: ['pending', 'accepted', 'rejected', 'completed', 'cancelled'], default: 'pending' } }, { timestamps: true });
+export default mongoose.model('ServiceRequest', serviceRequestSchema);

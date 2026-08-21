@@ -1,0 +1,24 @@
+import express from 'express';
+import cors from 'cors';
+import mongoose from 'mongoose';
+import authRoutes from './routes/authRoutes.js';
+import userRoutes from './routes/userRoutes.js';
+import { futureRoute } from './routes/futureRoutes.js';
+import { errorHandler, notFound } from './middleware/errorHandler.js';
+
+const app = express();
+app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173' }));
+app.use(express.json({ limit: '1mb' }));
+app.get('/api/health', (req, res) => res.json({ status: 'ok', database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected' }));
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/entrepreneurs', futureRoute('Entrepreneur'));
+app.use('/api/products', futureRoute('Product'));
+app.use('/api/services', futureRoute('Service'));
+app.use('/api/orders', futureRoute('Order'));
+app.use('/api/requests', futureRoute('Service request'));
+app.use('/api/reviews', futureRoute('Review'));
+app.use('/api/admin', futureRoute('Admin'));
+app.use(notFound);
+app.use(errorHandler);
+export default app;

@@ -1,0 +1,4 @@
+body { background: #f7f8f6; color: #1c2b23; }
+.hero { background: linear-gradient(135deg, #e6f5eb, #f8f4df); }
+.auth-card { max-width: 480px; }
+.navbar .nav-link.active { font-weight: 600; }
