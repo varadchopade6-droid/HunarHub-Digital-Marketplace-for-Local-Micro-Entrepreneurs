@@ -13,9 +13,7 @@ async function validateCategories(ids = []) { const count = await Category.count
 router.get('/', async (req, res, next) => {
   try {
     const { search, category, skill, location } = req.query;
-    // Until Stage 3's admin approval workflow exists, pending entrepreneurs are eligible
-    // to appear in discovery; explicitly rejected accounts are never exposed.
-    const filter = { verificationStatus: { $ne: 'rejected' } };
+    const filter = { verificationStatus: 'approved' };
     if (location) filter.location = { $regex: location.trim(), $options: 'i' };
     if (category || skill) filter.skills = category || skill;
     let profiles = await populateProfile(Entrepreneur.find(filter).sort('-createdAt'));
@@ -39,10 +37,12 @@ router.put('/me', protect, authorize('entrepreneur'), async (req, res, next) => 
 
 router.get('/:id', async (req, res, next) => {
   try {
-    const profile = await populateProfile(Entrepreneur.findOne({ _id: req.params.id, verificationStatus: { $ne: 'rejected' } }));
+    const profile = await populateProfile(Entrepreneur.findOne({ _id: req.params.id, verificationStatus: 'approved' }));
     if (!profile) return res.status(404).json({ message: 'Entrepreneur not found.' });
     const [services, products] = await Promise.all([Service.find({ entrepreneur: profile._id, isAvailable: true }).populate('category', 'name'), Product.find({ entrepreneur: profile._id, isAvailable: true, stock: { $gt: 0 } }).populate('category', 'name')]);
-    res.json({ ...profile.toJSON(), services, products });
+    const Review = (await import('../models/Review.js')).default;
+    const rating = await Review.aggregate([{ $match: { entrepreneur: profile._id } }, { $group: { _id: null, averageRating: { $avg: '$rating' }, ratingCount: { $sum: 1 } } }]);
+    res.json({ ...profile.toJSON(), services, products, averageRating: rating[0]?.averageRating || 0, ratingCount: rating[0]?.ratingCount || 0 });
   } catch (error) { next(error); }
 });
 export { ownProfile };

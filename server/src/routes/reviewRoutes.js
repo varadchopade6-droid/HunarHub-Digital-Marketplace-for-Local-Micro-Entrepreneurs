@@ -1,0 +1,10 @@
+import { Router } from 'express';
+import mongoose from 'mongoose';
+import Review from '../models/Review.js';
+import Order from '../models/Order.js';
+import ServiceRequest from '../models/ServiceRequest.js';
+import { protect, authorize } from '../middleware/auth.js';
+const router = Router();
+router.post('/', protect, authorize('customer'), async (req, res, next) => { try { const { orderId, serviceRequestId, rating, comment } = req.body; if ((!orderId && !serviceRequestId) || (orderId && serviceRequestId) || !Number.isInteger(rating) || rating < 1 || rating > 5) return res.status(400).json({ message: 'Provide one completed order or service request and a rating from 1 to 5.' }); let transaction; let entrepreneur; if (orderId) { transaction = await Order.findOne({ _id: orderId, customer: req.user._id, status: 'completed' }); entrepreneur = transaction?.entrepreneur; } else { transaction = await ServiceRequest.findOne({ _id: serviceRequestId, customer: req.user._id, status: 'completed' }); entrepreneur = transaction?.entrepreneur; } if (!transaction) return res.status(403).json({ message: 'Reviews are only allowed for your completed transactions.' }); const review = await Review.create({ customer: req.user._id, entrepreneur, ...(orderId ? { order: orderId } : { serviceRequest: serviceRequestId }), rating, comment }); res.status(201).json(await review.populate('customer', 'name')); } catch (error) { next(error); } });
+router.get('/entrepreneur/:id', async (req, res, next) => { try { if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid entrepreneur id.' }); const reviews = await Review.find({ entrepreneur: req.params.id }).populate('customer', 'name').sort('-createdAt'); const summary = await Review.aggregate([{ $match: { entrepreneur: new mongoose.Types.ObjectId(req.params.id) } }, { $group: { _id: null, averageRating: { $avg: '$rating' }, count: { $sum: 1 } } }]); res.json({ reviews, averageRating: summary[0]?.averageRating || 0, count: summary[0]?.count || 0 }); } catch (error) { next(error); } });
+export default router;
