@@ -12,10 +12,19 @@ async function validateCategories(ids = []) { const count = await Category.count
 
 router.get('/', async (req, res, next) => {
   try {
-    const { search, category, skill, location } = req.query;
+    const { search, category, skill, location, minPrice, maxPrice } = req.query;
     const filter = { verificationStatus: 'approved' };
     if (location) filter.location = { $regex: location.trim(), $options: 'i' };
     if (category || skill) filter.skills = category || skill;
+    if (minPrice !== undefined || maxPrice !== undefined) {
+      const price = { ...(minPrice !== undefined && { $gte: Number(minPrice) }), ...(maxPrice !== undefined && { $lte: Number(maxPrice) }) };
+      if (Number.isNaN(price.$gte) || Number.isNaN(price.$lte) || (price.$gte !== undefined && price.$lte !== undefined && price.$gte > price.$lte)) return res.status(400).json({ message: 'Provide a valid price range.' });
+      const [serviceEntrepreneurs, productEntrepreneurs] = await Promise.all([
+        Service.distinct('entrepreneur', { isAvailable: true, price }),
+        Product.distinct('entrepreneur', { isAvailable: true, stock: { $gt: 0 }, price })
+      ]);
+      filter._id = { $in: [...new Set([...serviceEntrepreneurs.map(String), ...productEntrepreneurs.map(String)])] };
+    }
     let profiles = await populateProfile(Entrepreneur.find(filter).sort('-createdAt'));
     if (search?.trim()) { const term = search.trim().toLowerCase(); profiles = profiles.filter((p) => [p.businessName, p.location, p.bio, p.user?.name, ...p.skills.map((s) => s.name)].filter(Boolean).some((value) => value.toLowerCase().includes(term))); }
     res.json(profiles);
